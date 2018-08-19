@@ -182,6 +182,7 @@ int main(int argc, char** argv) {
     table::Table table;
     table.colInfo(2).justify = table::ColInfo::RIGHT;
     table.newRow().add("ID").add("Description").add("MHz");
+    _mm256_zeroupper();
     for (const auto& test : ALL_FUNCS) {
         if (should_run(test, isas_supported)) {
             table.newRow()
