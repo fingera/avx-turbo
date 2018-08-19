@@ -51,7 +51,11 @@ struct test_func {
 
 extern "C" {
 // functions declared in asm-methods.asm
-FUNCS_X(DECLARE)
+FUNCS_X(DECLARE);
+
+
+// misc helpers
+void zeroupper();
 
 }
 
@@ -157,6 +161,16 @@ bool should_run(const test_func& t, ISA isas_supported) {
             && (!arg_focus || arg_focus.Get() == t.id);
 }
 
+std::vector<test_func> filter_tests(ISA isas_supported) {
+    std::vector<test_func> ret;
+    for (const auto& t : ALL_FUNCS) {
+        if (should_run(t, isas_supported)) {
+            ret.push_back(t);
+        }
+    }
+    return ret;
+}
+
 int main(int argc, char** argv) {
 
     try {
@@ -179,17 +193,26 @@ int main(int argc, char** argv) {
     run_test<RdtscClock>(first, 1000000); // warmup
 
 
+    auto iters = arg_iters.Get();
+    zeroupper();
+    auto tests = filter_tests(isas_supported);
+    std::vector<double> results(tests.size());
+
+    // run
+    for (size_t i = 0; i < tests.size(); i++) {
+        results[i] = run_test<RdtscClock>(tests[i].func, iters);
+    }
+
+    // report
     table::Table table;
     table.colInfo(2).justify = table::ColInfo::RIGHT;
     table.newRow().add("ID").add("Description").add("MHz");
-    _mm256_zeroupper();
-    for (const auto& test : ALL_FUNCS) {
-        if (should_run(test, isas_supported)) {
-            table.newRow()
-                    .add(test.id)
-                    .add(test.description)
-                    .addf("%4.0f", run_test<RdtscClock>(test.func, arg_iters.Get()) * 1000);
-        }
+    for (size_t i = 0; i < tests.size(); i++) {
+        const auto& test = tests[i];
+        table.newRow()
+                .add(test.id)
+                .add(test.description)
+                .addf("%4.0f", results[i] * 1000);
     }
 
     printf("==================\n%s================\n", table.str().c_str());
