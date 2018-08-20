@@ -56,6 +56,8 @@ struct test_func {
     x(avx3, "avx3", AVX512) \
     x(avx4, "avx4", AVX512) \
     x(avx5, "avx5", AVX512) \
+    x(avx6, "avx6", AVX512) \
+    x(avx7, "avx7", AVX512) \
 
 
 #define DECLARE(f,...) cal_f f;

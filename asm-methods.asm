@@ -75,6 +75,22 @@ sub rdi, 100
 jnz .top
 ret
 
+define_func avx6
+xor ecx, ecx
+.top:
+times 100 vpaddq zmm0, zmm15, zmm0
+sub rdi, 100
+jnz .top
+ret
+
+define_func avx7
+xor ecx, ecx
+.top:
+times 100 vpaddq zmm16, zmm0, zmm0
+sub rdi, 100
+jnz .top
+ret
+
 
 GLOBAL zeroupper:function
 zeroupper:
