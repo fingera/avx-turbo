@@ -78,7 +78,7 @@ ret
 define_func avx6
 xor ecx, ecx
 .top:
-times 100 vpaddq zmm0, zmm17, zmm0
+times 100 vpaddq zmm16, zmm18, zmm16
 sub rdi, 100
 jnz .top
 ret
@@ -86,7 +86,7 @@ ret
 define_func avx7
 xor ecx, ecx
 .top:
-times 100 vpaddq zmm0, zmm18, zmm0
+times 100 vpaddq zmm15, zmm18, zmm15
 sub rdi, 100
 jnz .top
 ret
