@@ -32,6 +32,25 @@ test_func avx128_iadd,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq xmm0, xmm0, xmm0}
 test_func avx256_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq ymm0, ymm0, ymm0}
 test_func avx512_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
 
+; define a test func that mostly just does does scalar adds but has one use-defined instruction every 100
+; with the given body instruction
+; %1 - function name
+; %2 - init instruction (e.g., xor out the variable you'll add to)
+; %3 - loop body instruction
+%macro test_funcB 3
+define_func %1
+xor ecx, ecx
+%2
+.top:
+%3
+times 100 add rcx, rcx
+sub rdi, 100
+jnz .top
+ret
+%endmacro
+
+test_funcB avx512_iaddB, {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
+
 GLOBAL zeroupper:function
 zeroupper:
 vzeroupper
