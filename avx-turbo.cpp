@@ -6,6 +6,7 @@
 #include "tsc-support.hpp"
 #include "table.hpp"
 #include "cpu.h"
+#include "msr-access.h"
 
 #include "args.hxx"
 
@@ -17,6 +18,12 @@
 #include <cassert>
 
 #include <error.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+
+#define MSR_IA32_MPERF 0x000000e7
+#define MSR_IA32_APERF 0x000000e8
 
 using std::uint64_t;
 using namespace std::chrono;
@@ -110,10 +117,85 @@ struct RdtscClock {
 
     /* accept the result of subtraction of durations and convert to nanos */
     static uint64_t to_nanos(now_t diff) {
-        static double tsc_to_nanos = 1000000000.0 / get_tsc_freq(arg_force_tsc_cal);
+        static double tsc_to_nanos = 1000000000.0 / tsc_freq();
         return diff * tsc_to_nanos;
     }
 
+    static uint64_t tsc_freq() {
+        static uint64_t freq = get_tsc_freq(arg_force_tsc_cal);
+        return freq;
+    }
+
+};
+
+/**
+ * We pass an outer_clock to run_test which times outside the iteration of the innermost loop (i.e.,
+ * it times around the loop that runs TRIES times), start should reset the state unless you want to
+ * time warmup iterations.
+ */
+struct outer_timer {
+    virtual void start() = 0;
+    virtual void stop() = 0;
+    virtual ~outer_timer() {}
+};
+
+struct dummy_outer : outer_timer {
+    static dummy_outer dummy;
+    virtual void start() override {};
+    virtual void stop() override {};
+};
+dummy_outer dummy_outer::dummy{};
+
+/** lets you determine the actual frequency over any interval using the free-running APERF and MPERF counters */
+struct aperf_ghz : outer_timer {
+    uint64_t mperf_value, aperf_value;
+    enum {
+        STARTED, STOPPED
+    } state;
+
+    aperf_ghz() : mperf_value(0), aperf_value(0), state(STOPPED) {}
+
+    uint64_t mperf() {
+        return read(MSR_IA32_MPERF);
+    }
+
+    uint64_t aperf() {
+        return read(MSR_IA32_APERF);
+    }
+
+    uint64_t read(uint32_t msr) {
+        uint64_t value = -1;
+        int res = read_msr_cur_cpu(msr, &value);
+        assert(res == 0);
+        return value;
+    }
+
+    virtual void start() override {
+        assert(state == STOPPED);
+        state = STARTED;
+        mperf_value = mperf();
+        aperf_value = aperf();
+//        printf("started timer m: %lu\n", mperf_value);
+//        printf("started timer a: %lu\n", aperf_value);
+    };
+
+    virtual void stop() override {
+        assert(state == STARTED);
+        mperf_value = mperf() - mperf_value;
+        aperf_value = aperf() - aperf_value;
+        state = STOPPED;
+//        printf("stopped timer m: %lu (delta)\n", mperf_value);
+//        printf("stopped timer a: %lu (delta)\n", aperf_value);
+    };
+
+    /** aperf / mperf ratio */
+    double ratio() {
+        assert(state == STOPPED);
+        assert(mperf_value != 0 && aperf_value != 0);
+//        printf("timer ratio m: %lu (delta)\n", mperf_value);
+//        printf("timer ratio a: %lu (delta)\n", aperf_value);
+        return (double)aperf_value / mperf_value;
+    }
 };
 
 /*
@@ -125,12 +207,13 @@ struct RdtscClock {
  * remove measurement overhead.
  */
 template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3>
-double run_test(cal_f* func, size_t iters) {
+double run_test(cal_f* func, size_t iters, outer_timer& outer) {
     assert(iters % 100 == 0);
 
     std::array<typename CLOCK::delta_t, TRIES> results;
 
     for (size_t w = 0; w < WARMUP + 1; w++) {
+        outer.start();
         for (size_t r = 0; r < TRIES; r++) {
             auto t0 = CLOCK::now();
             func(iters);
@@ -139,6 +222,7 @@ double run_test(cal_f* func, size_t iters) {
             auto t2 = CLOCK::now();
             results[r] = (t2 - t1) - (t1 - t0);
         }
+        outer.stop();
     }
 
     std::array<uint64_t, TRIES> nanos = {};
@@ -184,38 +268,55 @@ int main(int argc, char** argv) {
         exit(EXIT_SUCCESS);
     }
 
+    bool is_root = (geteuid() == 0);
+    bool use_aperf = is_root;
+    printf("Running as root     : [%s]\n", is_root   ? "YES" : "NO ");
     pin_to_cpu(0);
     ISA isas_supported = get_isas();
     printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
-    printf("tsc_freq = %.1f MHz (%s)\n", 1000000000.0 / RdtscClock::to_nanos(1000000), get_tsc_cal_info(arg_force_tsc_cal));
+    printf("tsc_freq = %.1f MHz (%s)\n", RdtscClock::tsc_freq() / 1000000.0, get_tsc_cal_info(arg_force_tsc_cal));
     auto first = ALL_FUNCS[0].func;
-    run_test<RdtscClock>(first, 1000000); // warmup
+    aperf_ghz aperf_timer;
+    outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
+    run_test<RdtscClock>(first, 1000000, outer); // warmup
 
 
     auto iters = arg_iters.Get();
     zeroupper();
     auto tests = filter_tests(isas_supported);
-    std::vector<double> results(tests.size());
+    std::vector<double>    op_results(tests.size());
+    std::vector<double> aperf_results(tests.size());
 
     // run
     for (size_t i = 0; i < tests.size(); i++) {
-        results[i] = run_test<RdtscClock>(tests[i].func, iters);
+        op_results[i] = run_test<RdtscClock>(tests[i].func, iters, outer);
+        aperf_results[i] = use_aperf ? aperf_timer.ratio() : 0.0;
     }
 
     // report
     table::Table table;
     table.colInfo(2).justify = table::ColInfo::RIGHT;
-    table.newRow().add("ID").add("Description").add("MHz");
+    auto& r = table.newRow().add("ID").add("Description").add("Mops");
+    if (use_aperf) {
+        r.add("A/M-ratio");
+        table.colInfo(3).justify = table::ColInfo::RIGHT;
+        r.add("A/M-MHz");
+        table.colInfo(4).justify = table::ColInfo::RIGHT;
+    }
     for (size_t i = 0; i < tests.size(); i++) {
         const auto& test = tests[i];
-        table.newRow()
+        auto& r = table.newRow()
                 .add(test.id)
                 .add(test.description)
-                .addf("%4.0f", results[i] * 1000);
+                .addf("%4.0f", op_results[i] * 1000);
+        if (use_aperf) {
+            r.addf("%5.2f", aperf_results[i]);
+            r.addf("%.0f", aperf_results[i] / 1000000.0 * RdtscClock::tsc_freq());
+        }
     }
 
-    printf("==================\n%s================\n", table.str().c_str());
+    printf("==================\n%s==================\n", table.str().c_str());
 
 //
 //    for (int i = 0; i < 2; i++) {
