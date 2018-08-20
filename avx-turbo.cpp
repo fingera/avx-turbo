@@ -54,6 +54,8 @@ struct test_func {
     x(avx512_iadd,  "512-bit integer adds", AVX512) \
     x(avx512_iaddB, "1:100 64:512-bit int adds", AVX512) \
     x(avx3, "avx3", AVX512) \
+    x(avx4, "avx4", AVX512) \
+    x(avx5, "avx5", AVX512) \
 
 
 #define DECLARE(f,...) cal_f f;

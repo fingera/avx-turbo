@@ -62,6 +62,14 @@ ret
 define_func avx4
 xor ecx, ecx
 .top:
+times 100 vpaddq zmm0, zmm16, zmm0
+sub rdi, 100
+jnz .top
+ret
+
+define_func avx5
+xor ecx, ecx
+.top:
 times 100 vpaddq zmm16, zmm16, zmm16
 sub rdi, 100
 jnz .top
