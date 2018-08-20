@@ -148,12 +148,12 @@ dummy_outer dummy_outer::dummy{};
 
 /** lets you determine the actual frequency over any interval using the free-running APERF and MPERF counters */
 struct aperf_ghz : outer_timer {
-    uint64_t mperf_value, aperf_value;
+    uint64_t mperf_value, aperf_value, tsc_value;
     enum {
         STARTED, STOPPED
     } state;
 
-    aperf_ghz() : mperf_value(0), aperf_value(0), state(STOPPED) {}
+    aperf_ghz() : mperf_value(0), aperf_value(0), tsc_value(0), state(STOPPED) {}
 
     uint64_t mperf() {
         return read(MSR_IA32_MPERF);
@@ -175,6 +175,7 @@ struct aperf_ghz : outer_timer {
         state = STARTED;
         mperf_value = mperf();
         aperf_value = aperf();
+        tsc_value = rdtsc();
 //        printf("started timer m: %lu\n", mperf_value);
 //        printf("started timer a: %lu\n", aperf_value);
     };
@@ -183,19 +184,31 @@ struct aperf_ghz : outer_timer {
         assert(state == STARTED);
         mperf_value = mperf() - mperf_value;
         aperf_value = aperf() - aperf_value;
+        tsc_value   = rdtsc() - tsc_value;
         state = STOPPED;
 //        printf("stopped timer m: %lu (delta)\n", mperf_value);
 //        printf("stopped timer a: %lu (delta)\n", aperf_value);
     };
 
     /** aperf / mperf ratio */
-    double ratio() {
+    double am_ratio() {
         assert(state == STOPPED);
         assert(mperf_value != 0 && aperf_value != 0);
 //        printf("timer ratio m: %lu (delta)\n", mperf_value);
 //        printf("timer ratio a: %lu (delta)\n", aperf_value);
         return (double)aperf_value / mperf_value;
     }
+
+    /** mperf / tsc ratio, i.e., the % of the time the core was unhalted */
+    double mt_ratio() {
+        assert(state == STOPPED);
+        assert(mperf_value != 0 && tsc_value != 0);
+//        printf("timer ratio m: %lu (delta)\n", mperf_value);
+//        printf("timer ratio a: %lu (delta)\n", aperf_value);
+        return (double)mperf_value / tsc_value;
+    }
+
+
 };
 
 /*
@@ -286,12 +299,14 @@ int main(int argc, char** argv) {
     zeroupper();
     auto tests = filter_tests(isas_supported);
     std::vector<double>    op_results(tests.size());
-    std::vector<double> aperf_results(tests.size());
+    std::vector<double> aperf_am(tests.size());
+    std::vector<double> aperf_mt(tests.size());
 
     // run
     for (size_t i = 0; i < tests.size(); i++) {
         op_results[i] = run_test<RdtscClock>(tests[i].func, iters, outer);
-        aperf_results[i] = use_aperf ? aperf_timer.ratio() : 0.0;
+        aperf_am[i] = use_aperf ? aperf_timer.am_ratio() : 0.0;
+        aperf_mt[i] = use_aperf ? aperf_timer.mt_ratio() : 0.0;
     }
 
     // report
@@ -303,6 +318,8 @@ int main(int argc, char** argv) {
         table.colInfo(3).justify = table::ColInfo::RIGHT;
         r.add("A/M-MHz");
         table.colInfo(4).justify = table::ColInfo::RIGHT;
+        r.add("M/tsc-ratio");
+        table.colInfo(5).justify = table::ColInfo::RIGHT;
     }
     for (size_t i = 0; i < tests.size(); i++) {
         const auto& test = tests[i];
@@ -311,8 +328,9 @@ int main(int argc, char** argv) {
                 .add(test.description)
                 .addf("%4.0f", op_results[i] * 1000);
         if (use_aperf) {
-            r.addf("%5.2f", aperf_results[i]);
-            r.addf("%.0f", aperf_results[i] / 1000000.0 * RdtscClock::tsc_freq());
+            r.addf("%5.2f", aperf_am[i]);
+            r.addf("%.0f", aperf_am[i] / 1000000.0 * RdtscClock::tsc_freq());
+            r.addf("%4.2f", aperf_mt[i]);
         }
     }
 
