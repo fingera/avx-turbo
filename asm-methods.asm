@@ -51,14 +51,6 @@ ret
 
 test_funcB avx512_iaddB, {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
 
-define_func avx3
-xor ecx, ecx
-ALIGN 64
-.top:
-times 100 vpaddq zmm0, zmm1, zmm0
-sub rdi, 100
-jnz .top
-ret
 
 define_func avx4
 xor ecx, ecx
@@ -74,6 +66,15 @@ xor ecx, ecx
 ALIGN 64
 .top:
 times 100 vpaddq zmm0, zmm16, zmm0
+sub rdi, 100
+jnz .top
+ret
+
+define_func avx3
+xor ecx, ecx
+ALIGN 64
+.top:
+times 100 vpaddq zmm0, zmm1, zmm0
 sub rdi, 100
 jnz .top
 ret
