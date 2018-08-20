@@ -54,7 +54,9 @@ test_funcB avx512_iaddB, {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
 define_func avx3
 xor ecx, ecx
 .top:
-times 100 vpaddq zmm0, zmm0, zmm0
+%rep 100
+vpaddq zmm0, zmm0, zmm0
+%endrep
 ;times 100 add rcx, rcx
 sub rdi, 100
 jnz .top
