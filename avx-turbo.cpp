@@ -50,8 +50,11 @@ struct test_func {
 #define FUNCS_X(x) \
     x(scalar_iadd,  "Scalar integer adds",  BASE)   \
     x(avx128_iadd,  "128-bit integer adds", AVX2)   \
+    x(avx128_imul,  "128-bit integer muls", AVX2)   \
     x(avx256_iadd,  "256-bit integer adds", AVX2)   \
+    x(avx256_imul,  "256-bit integer muls", AVX2)   \
     x(avx512_iadd,  "512-bit integer adds", AVX512) \
+    x(avx512_imul,  "512-bit integer muls", AVX512) \
 
 
 #define DECLARE(f,...) cal_f f;
