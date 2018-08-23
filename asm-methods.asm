@@ -28,74 +28,13 @@ ret
 %endmacro
 
 test_func scalar_iadd, {xor eax, eax}, {add rax, rax}
-test_func avx128_iadd,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq xmm0, xmm0, xmm0}
-test_func avx256_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq ymm0, ymm0, ymm0}
-test_func avx512_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
+test_func avx128_iadd,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq  xmm0, xmm0, xmm0}
+test_func avx128_imul,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpmulld xmm0, xmm0, xmm0}
+test_func avx256_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  ymm0, ymm0, ymm0}
+test_func avx256_imul,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmulld ymm0, ymm0, ymm0}
+test_func avx512_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
+test_func avx512_imul,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmulld zmm0, zmm0, zmm0}
 
-; define a test func that mostly just does does scalar adds but has one use-defined instruction every 100
-; with the given body instruction
-; %1 - function name
-; %2 - init instruction (e.g., xor out the variable you'll add to)
-; %3 - loop body instruction
-%macro test_funcB 3
-define_func %1
-xor ecx, ecx
-%2
-.top:
-%3
-times 100 add rcx, rcx
-sub rdi, 100
-jnz .top
-ret
-%endmacro
-
-test_funcB avx512_iaddB, {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
-
-define_func avx3
-xor ecx, ecx
-ALIGN 64
-.top:
-times 100 vpaddq zmm0, zmm1, zmm0
-sub rdi, 100
-jnz .top
-ret
-
-define_func avx4
-xor ecx, ecx
-ALIGN 64
-.top:
-times 100 vpaddq zmm0, zmm1, zmm0
-sub rdi, 100
-jnz .top
-ret
-
-define_func avx5
-xor ecx, ecx
-ALIGN 64
-.top:
-times 100 vpaddq zmm0, zmm16, zmm0
-sub rdi, 100
-jnz .top
-ret
-
-
-define_func avx6
-xor ecx, ecx
-ALIGN 64
-.top:
-times 100 vpaddq zmm16, zmm18, zmm16
-sub rdi, 100
-jnz .top
-ret
-
-define_func avx7
-xor ecx, ecx
-ALIGN 64
-.top:
-times 100 vpaddq zmm15, zmm18, zmm15
-sub rdi, 100
-jnz .top
-ret
 
 
 GLOBAL zeroupper:function
