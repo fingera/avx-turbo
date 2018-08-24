@@ -44,9 +44,16 @@ test_func avx512_fma ,  {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zm
 ; %2 - init instruction (e.g., xor out the variable you'll add to)
 ; %3 - register base like xmm, ymm, zmm
 ; %3 - loop body instruction only (no operands)
-%macro test_func_tput 4
+%macro test_func_tput 5
 define_func %1
-%2
+
+; init
+%assign r 0
+%rep 10
+%2 %3 %+ r, %5
+%assign r (r+1)
+%endrep
+
 .top:
 %rep 10
 %assign r 0
@@ -61,13 +68,17 @@ jnz .top
 ret
 %endmacro
 
-test_func_tput avx256_fma_t ,  {vzeroall}, ymm, vfmadd132pd
-test_func_tput avx512_fma_t ,  {vzeroall}, zmm, vfmadd132pd
+test_func_tput avx256_fma_t ,  vbroadcastsd, ymm, vfmadd132pd, [zero_dp]
+test_func_tput avx512_fma_t ,  vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
 
 
 GLOBAL zeroupper:function
 zeroupper:
 vzeroupper
 ret
+
+zero_dp: dq 0.0
+one_dp:  dq 1.0
+
 
 
