@@ -19,6 +19,7 @@
 #include <thread>
 #include <limits>
 #include <vector>
+#include <atomic>
 
 #include <error.h>
 #include <unistd.h>
@@ -294,12 +295,22 @@ struct result_holder {
     result_holder(const test_func* test) : test(test), valid{false}, op_results(nan), aperf_am(nan), aperf_mt(nan) {}
 };
 
-struct simple_barrier {
-    simple_barrier(size_t count);
+struct hot_barrier {
+    size_t break_count;
+    std::atomic<size_t> current;
+    hot_barrier(size_t count) : break_count(count) {}
+
+    /* hot spin on the waiter count until it hits the break point */
+    void wait() {
+        current++;
+        while (current.load() < break_count)
+            ;
+    }
 };
 
 struct test_thread {
     size_t id;
+    hot_barrier* barrier;
 
     /* output */
     result_holder res;
@@ -310,14 +321,15 @@ struct test_thread {
     bool use_aperf;
 
 
-    test_thread(size_t id, const test_func *test, size_t iters, bool use_aperf) :
-        id{id}, res{test}, test{test}, iters{iters}, use_aperf{use_aperf} {}
+    test_thread(size_t id, hot_barrier& barrier, const test_func *test, size_t iters, bool use_aperf) :
+        id{id}, barrier{&barrier}, res{test}, test{test}, iters{iters}, use_aperf{use_aperf} {}
 
     void operator()() {
 //        printf("Running test in thread %d, this = %p\n", id, this);
         pin_to_cpu(id);
         aperf_ghz aperf_timer;
         outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
+        barrier->wait();
         res.op_results = run_test<RdtscClock>(test->func, iters, outer);
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
         res.aperf_mt   = use_aperf ? aperf_timer.mt_ratio() : 0.0;
@@ -366,10 +378,11 @@ int main(int argc, char** argv) {
         // run
         for (size_t i = 0; i < tests.size(); i++) {
             const test_func& test = tests.at(i);
-            std::vector<test_thread> test_threads(thread_count, {0, nullptr, 0, false});
+            hot_barrier barrier{thread_count}, dummy{0};
+            std::vector<test_thread> test_threads(thread_count, {0, dummy, nullptr, 0, false});
             std::vector<std::thread> std_threads;
             for (size_t t = 0; t < thread_count; t++) {
-                test_threads.at(t) = {t, &test, iters, use_aperf};
+                test_threads.at(t) = {t, barrier, &test, iters, use_aperf};
                 std_threads.emplace_back(std::ref(test_threads.at(t)));
             }
 //            printf("THIS OUT %p\n", &t);
