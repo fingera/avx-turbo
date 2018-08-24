@@ -24,6 +24,7 @@
 #include <error.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/sysinfo.h>
 
 
 #define MSR_IA32_MPERF 0x000000e7
@@ -100,7 +101,7 @@ args::Flag arg_force_tsc_cal{parser, "force-tsc-calibrate",
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
 args::ValueFlag<size_t> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
-args::ValueFlag<size_t> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}, 4};
+args::ValueFlag<size_t> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
 
 
 template <typename CHRONO_CLOCK>
@@ -373,7 +374,10 @@ int main(int argc, char** argv) {
     zeroupper();
     auto tests = filter_tests(isas_supported);
 
-    for (size_t thread_count = arg_min_threads.Get(); thread_count <= arg_max_threads.Get(); thread_count++) {
+    size_t maxcpus = arg_max_threads ? arg_max_threads.Get() : get_nprocs();
+    printf("Will test up to %lu CPUs\n", maxcpus);
+
+    for (size_t thread_count = arg_min_threads.Get(); thread_count <= maxcpus; thread_count++) {
 
         std::vector<std::vector<result_holder>> results;
 
@@ -430,7 +434,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        printf("==== Threads: %2lu ====\n%s==================\n\n", thread_count, table.str().c_str());
+        printf("============================== Threads: %2lu ==============================\n%s"
+               "=========================================================================\n\n", thread_count, table.str().c_str());
     }
 
 
