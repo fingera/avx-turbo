@@ -38,6 +38,31 @@ test_func avx512_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
 test_func avx512_imul,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
 test_func avx512_fma ,  {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
+; this is like test_func, but it uses 10 parallel chains of instructions,
+; unrolled 10 times, so (probably) max throughput
+; %1 - function name
+; %2 - init instruction (e.g., xor out the variable you'll add to)
+; %3 - register base like xmm, ymm, zmm
+; %3 - loop body instruction only (no operands)
+%macro test_func_tput 4
+define_func %1
+%2
+.top:
+%rep 10
+%assign r 0
+%rep 10
+%4 %3 %+ r, %3 %+ r, %3 %+ r
+;vfmadd132pd ymm %+ r, ymm0, ymm0
+%assign r (r+1)
+%endrep
+%endrep
+sub rdi, 100
+jnz .top
+ret
+%endmacro
+
+test_func_tput avx256_fma_t ,  {vzeroall}, ymm, vfmadd132pd
+test_func_tput avx512_fma_t ,  {vzeroall}, zmm, vfmadd132pd
 
 
 GLOBAL zeroupper:function
