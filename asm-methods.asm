@@ -48,9 +48,9 @@ test_func avx512_fma ,  {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zm
 define_func %1
 %2
 .top:
-%rep 50
+%rep 10
 %assign r 0
-%rep 2
+%rep 10
 %4 %3 %+ r, %3 %+ r, %3 %+ r
 ;vfmadd132pd ymm %+ r, ymm0, ymm0
 %assign r (r+1)
