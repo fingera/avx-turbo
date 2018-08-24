@@ -50,7 +50,7 @@ define_func %1
 .top:
 %rep 25
 %assign r 0
-%rep 4
+%rep 3
 %4 %3 %+ r, %3 %+ r, %3 %+ r
 ;vfmadd132pd ymm %+ r, ymm0, ymm0
 %assign r (r+1)
