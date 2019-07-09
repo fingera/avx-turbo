@@ -60,6 +60,20 @@ struct test_func {
 
 #define FUNCS_X(x) \
     x(pause_only          , "pause instruction"              , BASE)   \
+    /* sha256 */ \
+    x(avx128_shr,  "shr", AVX2) \
+    x(avx256_shr,  "shr", AVX2) \
+    x(avx512_shr,  "shr", AVX512) \
+    x(avx128_xor,  "xor", AVX2) \
+    x(avx256_xor,  "xor", AVX2) \
+    x(avx512_xor,  "xor", AVX512) \
+    x(avx128_add_epi32,  "add", AVX2) \
+    x(avx256_add_epi32,  "add", AVX2) \
+    x(avx512_add_epi32,  "add", AVX512) \
+    x(avx128_and,  "and", AVX2) \
+    x(avx256_and,  "and", AVX2) \
+    x(avx512_and,  "and", AVX512) \
+    \
     x(ucomis              , "SSE scalar ucomis loop"         , AVX512) \
     x(ucomis_vex          , "VEX scalar ucomis loop"         , AVX512) \
                                                                        \

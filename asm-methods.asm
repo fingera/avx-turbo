@@ -36,6 +36,24 @@ ret
 ; pause
 test_func pause_only,     {},             {pause}, 1
 
+; sha256 xor
+test_func avx128_xor,     {pxor xmm0, xmm0}, {pxor xmm0, xmm0}
+test_func avx256_xor,     {vpxor ymm0, ymm0}, {vpxor ymm0, ymm0}
+test_func avx512_xor,     {vpxord zmm0, zmm0}, {vpxord zmm0, zmm0}
+; sha256 add
+test_func avx128_add_epi32,     {pxor xmm0, xmm0}, {vpaddd xmm0, xmm0, xmm0}
+test_func avx256_add_epi32,     {vpxor ymm0, ymm0}, {vpaddd ymm0, ymm0, ymm0}
+test_func avx512_add_epi32,     {vpxord zmm0, zmm0}, {vpaddd zmm0, zmm0, zmm0}
+; sha256 and
+test_func avx128_and,     {pxor xmm0, xmm0}, {pand xmm0, xmm0}
+test_func avx256_and,     {vpxor ymm0, ymm0}, {vpand ymm0, ymm0}
+test_func avx512_and,     {vpxord zmm0, zmm0}, {vpandd zmm0, zmm0}
+; sha256 shr
+test_func avx128_shr,     {pxor xmm0, xmm0}, {psrld xmm0, 2}
+test_func avx256_shr,     {vpxor ymm0, ymm0}, {vpsrld ymm0, 2}
+test_func avx512_shr,     {vpxord zmm0, zmm0}, {vpsrld zmm0, 2}
+
+
 ; vpermw latency
 test_func avx512_vpermw,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermw  zmm0, zmm0, zmm0}
 
