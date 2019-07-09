@@ -49,9 +49,12 @@ test_func avx128_and,     {pxor xmm0, xmm0}, {pand xmm0, xmm0}
 test_func avx256_and,     {vpxor ymm0, ymm0}, {vpand ymm0, ymm0}
 test_func avx512_and,     {vpxord zmm0, zmm0}, {vpandd zmm0, zmm0}
 ; sha256 shr
-test_func avx128_shr,     {pxor xmm0, xmm0}, {psrld xmm0, 2}
-test_func avx256_shr,     {vpxor ymm0, ymm0}, {vpsrld ymm0, 2}
-test_func avx512_shr,     {vpxord zmm0, zmm0}, {vpsrld zmm0, 2}
+test_func avx128_shr_epi32,     {pxor xmm0, xmm0}, {psrld xmm0, 2}
+test_func avx256_shr_epi32,     {vpxor ymm0, ymm0}, {vpsrld ymm0, 2}
+test_func avx512_shr_epi32,     {vpxord zmm0, zmm0}, {vpsrld zmm0, 2}
+test_func avx512128_rol_epi32,     {pxor xmm0, xmm0}, {vprold xmm0, 2}
+test_func avx512256_rol_epi32,     {vpxor ymm0, ymm0}, {vprold ymm0, 2}
+test_func avx512512_rol_epi32,     {vpxord zmm0, zmm0}, {vprold zmm0, 2}
 
 
 ; vpermw latency
